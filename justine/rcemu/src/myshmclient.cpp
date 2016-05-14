@@ -316,58 +316,74 @@ void justine::sampleclient::MyShmClient::start ( boost::asio::io_service& io_ser
     }
 }
 
-void justine::sampleclient::MyShmClient::start10 ( boost::asio::io_service& io_service, const char * port )
+void justine::sampleclient::MyShmClient::start10 (boost::asio::io_service& io_service, const char * port)
 {
+  // a kovetkezo reszek tovabbra is a szerverrel valo kommunikaciohoz szuksegesek
+  boost::asio::ip::tcp::resolver resolver (io_service);
+  boost::asio::ip::tcp::resolver::query query (boost::asio::ip::tcp::v4(), "localhost", port);
+  boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve (query);
 
-#ifdef DEBUG
-  foo();
-#endif
+  boost::asio::ip::tcp::socket socket (io_service);
+  boost::asio::connect (socket, iterator);
 
-  boost::asio::ip::tcp::resolver resolver ( io_service );
-  boost::asio::ip::tcp::resolver::query query ( boost::asio::ip::tcp::v4(), "localhost", port );
-  boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve ( query );
-
-  boost::asio::ip::tcp::socket socket ( io_service );
-  boost::asio::connect ( socket, iterator );
-
-  std::vector<Cop> cops = initcops ( socket );
+  std::vector<Cop> cops = initcops (socket);
 
   unsigned int g {0u};
   unsigned int f {0u};
   unsigned int t {0u};
   unsigned int s {0u};
 
-  std::vector<Gangster> gngstrs;
 
-  for ( ;; )
-    {
-      std::this_thread::sleep_for ( std::chrono::milliseconds ( 200 ) );
+   std::vector<Gangster> gngstrs;
 
-      for ( auto cop:cops )
-        {
-          car ( socket, cop, &f, &t, &s );
+  std::vector<unsigned> bunozo;
 
-          gngstrs = gangsters ( socket, cop, t );
+  for (auto cop:cops)
+    bunozo.push_back(0);
 
-          if ( gngstrs.size() > 0 )
-            g = gngstrs[0].to;
-          else
-            g = 0;
+  for (;;)
+  {
+    std::this_thread::sleep_for (std::chrono::milliseconds (200));
 
-          if ( g > 0 )
-            {
+    gngstrs = gangsters (socket, cops[0], t);
 
-              std::vector<osmium::unsigned_object_id_type> path = hasDijkstraPath ( t, g );
+    int rendor= (cops.size() / gngstrs.size());
 
-              if ( path.size() > 1 )
-                {
+        if (rendor < 1)
+            rendor = 1;
 
-                  std::copy ( path.begin(), path.end(),
-                              std::ostream_iterator<osmium::unsigned_object_id_type> ( std::cout, " -> " ) );
+   std::cout << "rendorok szama: " << rendor << std::endl;
 
-                  route ( socket, cop, path );
-                }
-            }
-        }
+    for(std::vector<int>::size_type i = 0; i != cops.size(); i++){ //std::vector<Cop>::iterator vmi=cops.begin();vmi!=cops.end();vmi++
+
+      bunozo[i] = gngstrs[(int)(i / rendor)].to;
+
+
+      std::cout << cops[i] << " - " << bunozo[i] << std::endl;
     }
+    //védési kiegészítés
+     	int nodes = 1336413315;
+     	std::vector<osmium::unsigned_object_id_type> path = hasDijkstraPath ( nodes, bunozo[0]);
+
+    for(std::vector<int>::size_type i = 1; i != cops.size(); i++)
+    {
+      car (socket, cops[i], &f, &t, &s);
+
+    /*  std::vector<osmium::unsigned_object_id_type> path =
+        hasDijkstraPath (t, bunozo[i]);
+      std::vector<osmium::unsigned_object_id_type> path2 =
+        hasDijkstraPath (nodes, bunozo[0]);
+*/
+                      std::vector<osmium::unsigned_object_id_type> path = hasDijkstraPath ( t, bunozo[i]); //útvonalat készít
+
+
+      if (path.size() > 1)
+      {
+        std::copy (path.begin(), path.end(),
+                   std::ostream_iterator<osmium::unsigned_object_id_type>(std::cout, " -> ")) ;
+
+        route (socket, cops[i], path);
+      }
+    }
+  }
 }
